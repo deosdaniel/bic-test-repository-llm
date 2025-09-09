@@ -1,8 +1,12 @@
 import logging
 import requests
+import time
 from fastapi import APIRouter, HTTPException
+
 from config import OPENROUTER_API_KEY, OPENROUTER_URL, LOG_FILE, MODELS
 from schemas import GenerateRequest
+from utils import post_with_retry
+
 
 
 # Логирование
@@ -32,19 +36,23 @@ async def generate(request: GenerateRequest):
     payload = {
         "model": request.model,
         "messages": [{"role": "user", "content": request.prompt}],
+        "max_tokens": request.max_tokens,
     }
 
-    try:
-        resp = requests.post(OPENROUTER_URL, headers=headers, json=payload, timeout=60)
-        if resp.status_code != 200:
-            logger.error(f"OpenRouter error: {resp.status_code} {resp.text}")
-            raise HTTPException(status_code=resp.status_code, detail=resp.text)
+    start = time.time()
+    resp = post_with_retry(OPENROUTER_URL, headers, payload)
+    latency = time.time() - start
 
-        data = resp.json()
-        # OpenAI-совместимый формат: choices[0].message.content
-        text = data["choices"][0]["message"]["content"]
-        return {"response": text}
+    if resp.status_code != 200:
+        logger.error(f"OpenRouter error: {resp.status_code} {resp.text}")
+        raise HTTPException(status_code=resp.status_code, detail=resp.text)
 
-    except Exception as e:
-        logger.exception("Error in /generate")
-        raise HTTPException(status_code=500, detail=str(e))
+    data = resp.json()
+    text = data["choices"][0]["message"]["content"]
+    tokens_used = data.get("usage", {}).get("total_tokens")
+
+    return {
+        "response": text,
+        "tokens_used": tokens_used,
+        "latency_seconds": latency,
+    }
