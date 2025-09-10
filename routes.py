@@ -98,7 +98,7 @@ async def benchmark(
         logger.error("No prompts found in file")
         raise HTTPException(status_code=400, detail="No prompts found in file")
 
-    results = []  # список (prompt, run, latency)
+    results = []
     for prompt in prompts:
         for i in range(runs):
             headers = {
