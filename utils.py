@@ -15,4 +15,5 @@ def post_with_retry(url: str, headers: dict, json_payload: dict,
             time.sleep(sleep_for)
             continue
         return resp
+    logger.error("Rate limit exceeded after all retries")
     raise HTTPException(status_code=429, detail="Rate limit exceeded after retries")
